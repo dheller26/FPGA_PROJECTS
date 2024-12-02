@@ -1,0 +1,5 @@
+median filter project which supposed to integrate with ov7670 camera module 
+
+the median filter algorithm is used with even-odd sorter which requires 9 clock cycles 
+
+the way of catching the pixel are done with 4 rams which are 640 address each

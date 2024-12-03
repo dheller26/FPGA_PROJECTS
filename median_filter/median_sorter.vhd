@@ -6,14 +6,14 @@ use IEEE.STD_LOGIC_UNSIGNED.ALL;
 entity MedianSorter is
     Port (
         clk      : in  std_logic;                       -- Clock signal
-        pixels   : in  std_logic_vector(8*9-1 downto 0); -- Input 9 pixels, each 8 bits
-        median   : out std_logic_vector(7 downto 0);     -- Median output
+        pixels   : in  std_logic_vector(4*9-1 downto 0); -- Input 9 pixels, each 4 bits
+        median   : out std_logic_vector(3 downto 0);     -- Median output
         valid     : out std_logic
     );
 end MedianSorter;
 
 architecture Behavioral of MedianSorter is
-    type pixel_array is array(0 to 8) of std_logic_vector(7 downto 0);
+    type pixel_array is array(0 to 8) of std_logic_vector(3 downto 0);
     signal pixel_reg : pixel_array;                     -- Array to hold input pixels
     signal sorted    : pixel_array;                     -- Array to hold sorted pixels
     signal done      : std_logic := '1';                -- Sorting completion flag

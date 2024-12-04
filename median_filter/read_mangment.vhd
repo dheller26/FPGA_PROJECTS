@@ -136,7 +136,7 @@ srl_comp_1 : c_shift_ram_0
   PORT MAP (
     A => srl_sel,
     D =>  pixel_srl_1_in,
-    CLK => clk_pipline,
+    CLK => clk_ram,
     CE => '1',
     Q => pixel_srl_1_out
   );
@@ -144,7 +144,7 @@ srl_comp_2 : c_shift_ram_0
   PORT MAP (
     A => srl_sel,
     D =>  pixel_srl_2_in,
-    CLK => clk_pipline,
+    CLK => clk_ram,
     CE => '1',
     Q => pixel_srl_2_out
   );
@@ -152,7 +152,7 @@ srl_comp_3 : c_shift_ram_0
   PORT MAP (
     A => srl_sel,
     D =>  pixel_srl_3_in,
-    CLK => clk_pipline,
+    CLK => clk_ram,
     CE => '1',
     Q => pixel_srl_3_out
   );

@@ -20,12 +20,18 @@ set script_folder [_tcl::get_script_folder]
 ################################################################
 # Check if script is running in correct Vivado version.
 ################################################################
-set scripts_vivado_version 2021.1
+set scripts_vivado_version 2024.1
 set current_vivado_version [version -short]
 
 if { [string first $scripts_vivado_version $current_vivado_version] == -1 } {
    puts ""
-   catch {common::send_gid_msg -ssname BD::TCL -id 2041 -severity "ERROR" "This script was generated using Vivado <$scripts_vivado_version> and is being run in <$current_vivado_version> of Vivado. Please run the script in Vivado <$scripts_vivado_version> then open the design in Vivado <$current_vivado_version>. Upgrade the design by running \"Tools => Report => Report IP Status...\", then run write_bd_tcl to create an updated script."}
+   if { [string compare $scripts_vivado_version $current_vivado_version] > 0 } {
+      catch {common::send_gid_msg -ssname BD::TCL -id 2042 -severity "ERROR" " This script was generated using Vivado <$scripts_vivado_version> and is being run in <$current_vivado_version> of Vivado. Sourcing the script failed since it was created with a future version of Vivado."}
+
+   } else {
+     catch {common::send_gid_msg -ssname BD::TCL -id 2041 -severity "ERROR" "This script was generated using Vivado <$scripts_vivado_version> and is being run in <$current_vivado_version> of Vivado. Please run the script in Vivado <$scripts_vivado_version> then open the design in Vivado <$current_vivado_version>. Upgrade the design by running \"Tools => Report => Report IP Status...\", then run write_bd_tcl to create an updated script."}
+
+   }
 
    return 1
 }
@@ -40,7 +46,7 @@ if { [string first $scripts_vivado_version $current_vivado_version] == -1 } {
 
 # The design that will be created by this Tcl script contains the following 
 # module references:
-# MedianSorter
+# write_buffer_manager, read_mangment, MedianSorter, MedianSorter, MedianSorter
 
 # Please add the sources of those modules before sourcing this Tcl script.
 
@@ -131,9 +137,12 @@ set bCheckIPsPassed 1
 set bCheckIPs 1
 if { $bCheckIPs == 1 } {
    set list_check_ips "\ 
-xilinx.com:ip:clk_wiz:6.0\
 xilinx.com:ip:blk_mem_gen:8.4\
+xilinx.com:ip:clk_wiz:6.0\
+xilinx.com:ip:xlconstant:1.1\
 xilinx.com:ip:xlconcat:2.1\
+xilinx.com:ip:util_reduced_logic:2.0\
+xilinx.com:ip:proc_sys_reset:5.0\
 "
 
    set list_ips_missing ""
@@ -159,6 +168,10 @@ xilinx.com:ip:xlconcat:2.1\
 set bCheckModules 1
 if { $bCheckModules == 1 } {
    set list_check_mods "\ 
+write_buffer_manager\
+read_mangment\
+MedianSorter\
+MedianSorter\
 MedianSorter\
 "
 
@@ -224,149 +237,223 @@ proc create_root_design { parentCell } {
   # Create interface ports
 
   # Create ports
-  set pixel_clock [ create_bd_port -dir I -type clk pixel_clock ]
+  set pixel_clk [ create_bd_port -dir I -type clk -freq_hz 10000000 pixel_clk ]
+  set pixel_filtered_valid [ create_bd_port -dir O pixel_filtered_valid ]
+  set filtered_pixel [ create_bd_port -dir O -from 11 -to 0 filtered_pixel ]
+  set reset [ create_bd_port -dir I -type rst reset ]
+  set_property -dict [ list \
+   CONFIG.POLARITY {ACTIVE_LOW} \
+ ] $reset
+  set pixel_in_0 [ create_bd_port -dir I -from 11 -to 0 pixel_in_0 ]
 
-  # Create instance: MedianSorter_0, and set properties
-  set block_name MedianSorter
-  set block_cell_name MedianSorter_0
-  if { [catch {set MedianSorter_0 [create_bd_cell -type module -reference $block_name $block_cell_name] } errmsg] } {
+  # Create instance: line_buffer1, and set properties
+  set line_buffer1 [ create_bd_cell -type ip -vlnv xilinx.com:ip:blk_mem_gen:8.4 line_buffer1 ]
+  set_property -dict [list \
+    CONFIG.Enable_A {Always_Enabled} \
+    CONFIG.Enable_B {Always_Enabled} \
+    CONFIG.Fill_Remaining_Memory_Locations {true} \
+    CONFIG.Memory_Type {Simple_Dual_Port_RAM} \
+    CONFIG.Register_PortB_Output_of_Memory_Primitives {false} \
+    CONFIG.Write_Depth_A {640} \
+    CONFIG.Write_Width_A {12} \
+    CONFIG.use_bram_block {Stand_Alone} \
+  ] $line_buffer1
+
+
+  # Create instance: line_buffer2, and set properties
+  set line_buffer2 [ create_bd_cell -type ip -vlnv xilinx.com:ip:blk_mem_gen:8.4 line_buffer2 ]
+  set_property -dict [list \
+    CONFIG.Enable_A {Always_Enabled} \
+    CONFIG.Enable_B {Always_Enabled} \
+    CONFIG.Fill_Remaining_Memory_Locations {true} \
+    CONFIG.Memory_Type {Simple_Dual_Port_RAM} \
+    CONFIG.Register_PortB_Output_of_Memory_Primitives {false} \
+    CONFIG.Write_Depth_A {640} \
+    CONFIG.Write_Width_A {12} \
+    CONFIG.use_bram_block {Stand_Alone} \
+  ] $line_buffer2
+
+
+  # Create instance: line_buffer3, and set properties
+  set line_buffer3 [ create_bd_cell -type ip -vlnv xilinx.com:ip:blk_mem_gen:8.4 line_buffer3 ]
+  set_property -dict [list \
+    CONFIG.Enable_A {Always_Enabled} \
+    CONFIG.Enable_B {Always_Enabled} \
+    CONFIG.Fill_Remaining_Memory_Locations {true} \
+    CONFIG.Memory_Type {Simple_Dual_Port_RAM} \
+    CONFIG.Register_PortB_Output_of_Memory_Primitives {false} \
+    CONFIG.Write_Depth_A {640} \
+    CONFIG.Write_Width_A {12} \
+    CONFIG.use_bram_block {Stand_Alone} \
+  ] $line_buffer3
+
+
+  # Create instance: line_buffer4, and set properties
+  set line_buffer4 [ create_bd_cell -type ip -vlnv xilinx.com:ip:blk_mem_gen:8.4 line_buffer4 ]
+  set_property -dict [list \
+    CONFIG.Enable_A {Always_Enabled} \
+    CONFIG.Enable_B {Always_Enabled} \
+    CONFIG.Fill_Remaining_Memory_Locations {true} \
+    CONFIG.Memory_Type {Simple_Dual_Port_RAM} \
+    CONFIG.Register_PortB_Output_of_Memory_Primitives {false} \
+    CONFIG.Write_Depth_A {640} \
+    CONFIG.Write_Width_A {12} \
+    CONFIG.use_bram_block {Stand_Alone} \
+  ] $line_buffer4
+
+
+  # Create instance: clk_wiz_pll, and set properties
+  set clk_wiz_pll [ create_bd_cell -type ip -vlnv xilinx.com:ip:clk_wiz:6.0 clk_wiz_pll ]
+  set_property -dict [list \
+    CONFIG.CLKIN1_JITTER_PS {1000.0} \
+    CONFIG.CLKOUT1_JITTER {933.258} \
+    CONFIG.CLKOUT1_PHASE_ERROR {908.603} \
+    CONFIG.CLKOUT1_REQUESTED_OUT_FREQ {10} \
+    CONFIG.CLKOUT2_JITTER {760.423} \
+    CONFIG.CLKOUT2_PHASE_ERROR {908.603} \
+    CONFIG.CLKOUT2_REQUESTED_OUT_FREQ {30} \
+    CONFIG.CLKOUT2_USED {true} \
+    CONFIG.CLKOUT3_JITTER {657.457} \
+    CONFIG.CLKOUT3_PHASE_ERROR {908.603} \
+    CONFIG.CLKOUT3_REQUESTED_OUT_FREQ {90} \
+    CONFIG.CLKOUT3_USED {true} \
+    CONFIG.CLK_OUT1_PORT {clk_ram_10} \
+    CONFIG.CLK_OUT2_PORT {clk_srl_30} \
+    CONFIG.CLK_OUT3_PORT {clk_median_90} \
+    CONFIG.MMCM_CLKFBOUT_MULT_F {63.000} \
+    CONFIG.MMCM_CLKIN1_PERIOD {100.000} \
+    CONFIG.MMCM_CLKIN2_PERIOD {10.0} \
+    CONFIG.MMCM_CLKOUT0_DIVIDE_F {63.000} \
+    CONFIG.MMCM_CLKOUT1_DIVIDE {21} \
+    CONFIG.MMCM_CLKOUT2_DIVIDE {7} \
+    CONFIG.NUM_OUT_CLKS {3} \
+    CONFIG.PRIM_IN_FREQ {10} \
+  ] $clk_wiz_pll
+
+
+  # Create instance: write_buffer_manager_0, and set properties
+  set block_name write_buffer_manager
+  set block_cell_name write_buffer_manager_0
+  if { [catch {set write_buffer_manager_0 [create_bd_cell -type module -reference $block_name $block_cell_name] } errmsg] } {
      catch {common::send_gid_msg -ssname BD::TCL -id 2095 -severity "ERROR" "Unable to add referenced block <$block_name>. Please add the files for ${block_name}'s definition into the project."}
      return 1
-   } elseif { $MedianSorter_0 eq "" } {
+   } elseif { $write_buffer_manager_0 eq "" } {
      catch {common::send_gid_msg -ssname BD::TCL -id 2096 -severity "ERROR" "Unable to referenced block <$block_name>. Please add the files for ${block_name}'s definition into the project."}
      return 1
    }
   
-  # Create instance: clk_wiz_0, and set properties
-  set clk_wiz_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:clk_wiz:6.0 clk_wiz_0 ]
-  set_property -dict [ list \
-   CONFIG.CLKOUT1_JITTER {126.133} \
-   CONFIG.CLKOUT1_PHASE_ERROR {94.994} \
-   CONFIG.CLKOUT1_USED {true} \
-   CONFIG.CLKOUT2_JITTER {116.798} \
-   CONFIG.CLKOUT2_PHASE_ERROR {94.994} \
-   CONFIG.CLKOUT2_REQUESTED_OUT_FREQ {150} \
-   CONFIG.CLKOUT2_USED {true} \
-   CONFIG.CLK_OUT1_PORT {pixel_clock_orig} \
-   CONFIG.CLK_OUT2_PORT {read_filter_clock} \
-   CONFIG.MMCM_CLKFBOUT_MULT_F {10.500} \
-   CONFIG.MMCM_CLKOUT0_DIVIDE_F {10.500} \
-   CONFIG.MMCM_CLKOUT1_DIVIDE {7} \
-   CONFIG.NUM_OUT_CLKS {2} \
- ] $clk_wiz_0
+  # Create instance: zero_rst, and set properties
+  set zero_rst [ create_bd_cell -type ip -vlnv xilinx.com:ip:xlconstant:1.1 zero_rst ]
+  set_property CONFIG.CONST_VAL {0} $zero_rst
 
-  # Create instance: line_buffer_1, and set properties
-  set line_buffer_1 [ create_bd_cell -type ip -vlnv xilinx.com:ip:blk_mem_gen:8.4 line_buffer_1 ]
-  set_property -dict [ list \
-   CONFIG.Byte_Size {9} \
-   CONFIG.EN_SAFETY_CKT {false} \
-   CONFIG.Enable_32bit_Address {false} \
-   CONFIG.Enable_A {Always_Enabled} \
-   CONFIG.Enable_B {Always_Enabled} \
-   CONFIG.Fill_Remaining_Memory_Locations {true} \
-   CONFIG.Memory_Type {Simple_Dual_Port_RAM} \
-   CONFIG.Operating_Mode_A {NO_CHANGE} \
-   CONFIG.Port_B_Clock {100} \
-   CONFIG.Port_B_Enable_Rate {100} \
-   CONFIG.Read_Width_A {8} \
-   CONFIG.Read_Width_B {8} \
-   CONFIG.Register_PortA_Output_of_Memory_Primitives {false} \
-   CONFIG.Register_PortB_Output_of_Memory_Primitives {false} \
-   CONFIG.Use_Byte_Write_Enable {false} \
-   CONFIG.Use_RSTA_Pin {false} \
-   CONFIG.Write_Depth_A {640} \
-   CONFIG.Write_Width_A {8} \
-   CONFIG.Write_Width_B {8} \
-   CONFIG.use_bram_block {Stand_Alone} \
- ] $line_buffer_1
 
-  # Create instance: line_buffer_2, and set properties
-  set line_buffer_2 [ create_bd_cell -type ip -vlnv xilinx.com:ip:blk_mem_gen:8.4 line_buffer_2 ]
-  set_property -dict [ list \
-   CONFIG.Byte_Size {9} \
-   CONFIG.EN_SAFETY_CKT {false} \
-   CONFIG.Enable_32bit_Address {false} \
-   CONFIG.Enable_A {Always_Enabled} \
-   CONFIG.Enable_B {Always_Enabled} \
-   CONFIG.Fill_Remaining_Memory_Locations {true} \
-   CONFIG.Memory_Type {Simple_Dual_Port_RAM} \
-   CONFIG.Operating_Mode_A {NO_CHANGE} \
-   CONFIG.Port_B_Clock {100} \
-   CONFIG.Port_B_Enable_Rate {100} \
-   CONFIG.Read_Width_A {8} \
-   CONFIG.Read_Width_B {8} \
-   CONFIG.Register_PortA_Output_of_Memory_Primitives {false} \
-   CONFIG.Register_PortB_Output_of_Memory_Primitives {false} \
-   CONFIG.Use_Byte_Write_Enable {false} \
-   CONFIG.Use_RSTA_Pin {false} \
-   CONFIG.Write_Depth_A {640} \
-   CONFIG.Write_Width_A {8} \
-   CONFIG.Write_Width_B {8} \
-   CONFIG.use_bram_block {Stand_Alone} \
- ] $line_buffer_2
+  # Create instance: read_mangment_0, and set properties
+  set block_name read_mangment
+  set block_cell_name read_mangment_0
+  if { [catch {set read_mangment_0 [create_bd_cell -type module -reference $block_name $block_cell_name] } errmsg] } {
+     catch {common::send_gid_msg -ssname BD::TCL -id 2095 -severity "ERROR" "Unable to add referenced block <$block_name>. Please add the files for ${block_name}'s definition into the project."}
+     return 1
+   } elseif { $read_mangment_0 eq "" } {
+     catch {common::send_gid_msg -ssname BD::TCL -id 2096 -severity "ERROR" "Unable to referenced block <$block_name>. Please add the files for ${block_name}'s definition into the project."}
+     return 1
+   }
+  
+  # Create instance: MedianSorter_B, and set properties
+  set block_name MedianSorter
+  set block_cell_name MedianSorter_B
+  if { [catch {set MedianSorter_B [create_bd_cell -type module -reference $block_name $block_cell_name] } errmsg] } {
+     catch {common::send_gid_msg -ssname BD::TCL -id 2095 -severity "ERROR" "Unable to add referenced block <$block_name>. Please add the files for ${block_name}'s definition into the project."}
+     return 1
+   } elseif { $MedianSorter_B eq "" } {
+     catch {common::send_gid_msg -ssname BD::TCL -id 2096 -severity "ERROR" "Unable to referenced block <$block_name>. Please add the files for ${block_name}'s definition into the project."}
+     return 1
+   }
+  
+  # Create instance: MedianSorter_G, and set properties
+  set block_name MedianSorter
+  set block_cell_name MedianSorter_G
+  if { [catch {set MedianSorter_G [create_bd_cell -type module -reference $block_name $block_cell_name] } errmsg] } {
+     catch {common::send_gid_msg -ssname BD::TCL -id 2095 -severity "ERROR" "Unable to add referenced block <$block_name>. Please add the files for ${block_name}'s definition into the project."}
+     return 1
+   } elseif { $MedianSorter_G eq "" } {
+     catch {common::send_gid_msg -ssname BD::TCL -id 2096 -severity "ERROR" "Unable to referenced block <$block_name>. Please add the files for ${block_name}'s definition into the project."}
+     return 1
+   }
+  
+  # Create instance: MedianSorter_R, and set properties
+  set block_name MedianSorter
+  set block_cell_name MedianSorter_R
+  if { [catch {set MedianSorter_R [create_bd_cell -type module -reference $block_name $block_cell_name] } errmsg] } {
+     catch {common::send_gid_msg -ssname BD::TCL -id 2095 -severity "ERROR" "Unable to add referenced block <$block_name>. Please add the files for ${block_name}'s definition into the project."}
+     return 1
+   } elseif { $MedianSorter_R eq "" } {
+     catch {common::send_gid_msg -ssname BD::TCL -id 2096 -severity "ERROR" "Unable to referenced block <$block_name>. Please add the files for ${block_name}'s definition into the project."}
+     return 1
+   }
+  
+  # Create instance: median_valid_concat, and set properties
+  set median_valid_concat [ create_bd_cell -type ip -vlnv xilinx.com:ip:xlconcat:2.1 median_valid_concat ]
+  set_property CONFIG.NUM_PORTS {3} $median_valid_concat
 
-  # Create instance: line_buffer_3, and set properties
-  set line_buffer_3 [ create_bd_cell -type ip -vlnv xilinx.com:ip:blk_mem_gen:8.4 line_buffer_3 ]
-  set_property -dict [ list \
-   CONFIG.Byte_Size {9} \
-   CONFIG.EN_SAFETY_CKT {false} \
-   CONFIG.Enable_32bit_Address {false} \
-   CONFIG.Enable_A {Always_Enabled} \
-   CONFIG.Enable_B {Always_Enabled} \
-   CONFIG.Fill_Remaining_Memory_Locations {true} \
-   CONFIG.Memory_Type {Simple_Dual_Port_RAM} \
-   CONFIG.Operating_Mode_A {NO_CHANGE} \
-   CONFIG.Port_B_Clock {100} \
-   CONFIG.Port_B_Enable_Rate {100} \
-   CONFIG.Read_Width_A {8} \
-   CONFIG.Read_Width_B {8} \
-   CONFIG.Register_PortA_Output_of_Memory_Primitives {false} \
-   CONFIG.Register_PortB_Output_of_Memory_Primitives {false} \
-   CONFIG.Use_Byte_Write_Enable {false} \
-   CONFIG.Use_RSTA_Pin {false} \
-   CONFIG.Write_Depth_A {640} \
-   CONFIG.Write_Width_A {8} \
-   CONFIG.Write_Width_B {8} \
-   CONFIG.use_bram_block {Stand_Alone} \
- ] $line_buffer_3
 
-  # Create instance: line_buffer_4, and set properties
-  set line_buffer_4 [ create_bd_cell -type ip -vlnv xilinx.com:ip:blk_mem_gen:8.4 line_buffer_4 ]
-  set_property -dict [ list \
-   CONFIG.Byte_Size {9} \
-   CONFIG.EN_SAFETY_CKT {false} \
-   CONFIG.Enable_32bit_Address {false} \
-   CONFIG.Enable_A {Always_Enabled} \
-   CONFIG.Enable_B {Always_Enabled} \
-   CONFIG.Fill_Remaining_Memory_Locations {true} \
-   CONFIG.Memory_Type {Simple_Dual_Port_RAM} \
-   CONFIG.Operating_Mode_A {NO_CHANGE} \
-   CONFIG.Port_B_Clock {100} \
-   CONFIG.Port_B_Enable_Rate {100} \
-   CONFIG.Read_Width_A {8} \
-   CONFIG.Read_Width_B {8} \
-   CONFIG.Register_PortA_Output_of_Memory_Primitives {false} \
-   CONFIG.Register_PortB_Output_of_Memory_Primitives {false} \
-   CONFIG.Use_Byte_Write_Enable {false} \
-   CONFIG.Use_RSTA_Pin {false} \
-   CONFIG.Write_Depth_A {640} \
-   CONFIG.Write_Width_A {8} \
-   CONFIG.Write_Width_B {8} \
-   CONFIG.use_bram_block {Stand_Alone} \
- ] $line_buffer_4
+  # Create instance: bitwise_and, and set properties
+  set bitwise_and [ create_bd_cell -type ip -vlnv xilinx.com:ip:util_reduced_logic:2.0 bitwise_and ]
+  set_property CONFIG.C_SIZE {3} $bitwise_and
 
-  # Create instance: xlconcat_0, and set properties
-  set xlconcat_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:xlconcat:2.1 xlconcat_0 ]
-  set_property -dict [ list \
-   CONFIG.IN0_WIDTH {8} \
-   CONFIG.IN1_WIDTH {8} \
-   CONFIG.IN2_WIDTH {8} \
-   CONFIG.NUM_PORTS {3} \
- ] $xlconcat_0
+
+  # Create instance: color_merger, and set properties
+  set color_merger [ create_bd_cell -type ip -vlnv xilinx.com:ip:xlconcat:2.1 color_merger ]
+  set_property -dict [list \
+    CONFIG.IN0_WIDTH {4} \
+    CONFIG.IN1_WIDTH {4} \
+    CONFIG.IN2_WIDTH {4} \
+    CONFIG.NUM_PORTS {3} \
+  ] $color_merger
+
+
+  # Create instance: proc_sys_reset_0, and set properties
+  set proc_sys_reset_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:proc_sys_reset:5.0 proc_sys_reset_0 ]
+  set_property -dict [list \
+    CONFIG.RESET_BOARD_INTERFACE {reset} \
+    CONFIG.USE_BOARD_FLOW {true} \
+  ] $proc_sys_reset_0
+
 
   # Create port connections
-  connect_bd_net -net clk_wiz_0_read_filter_clock [get_bd_pins MedianSorter_0/clk] [get_bd_pins clk_wiz_0/read_filter_clock] [get_bd_pins line_buffer_1/clkb] [get_bd_pins line_buffer_2/clkb] [get_bd_pins line_buffer_3/clkb] [get_bd_pins line_buffer_4/clkb]
-  connect_bd_net -net clka_0_1 [get_bd_ports pixel_clock] [get_bd_pins clk_wiz_0/clk_in1] [get_bd_pins line_buffer_1/clka] [get_bd_pins line_buffer_2/clka] [get_bd_pins line_buffer_3/clka] [get_bd_pins line_buffer_4/clka]
+  connect_bd_net -net MedianSorter_B_median [get_bd_pins MedianSorter_B/median] [get_bd_pins color_merger/In2]
+  connect_bd_net -net MedianSorter_B_valid [get_bd_pins MedianSorter_B/valid] [get_bd_pins median_valid_concat/In1]
+  connect_bd_net -net MedianSorter_G_median [get_bd_pins MedianSorter_G/median] [get_bd_pins color_merger/In1]
+  connect_bd_net -net MedianSorter_G_valid [get_bd_pins MedianSorter_G/valid] [get_bd_pins median_valid_concat/In0]
+  connect_bd_net -net MedianSorter_R_median [get_bd_pins MedianSorter_R/median] [get_bd_pins color_merger/In0]
+  connect_bd_net -net MedianSorter_R_valid [get_bd_pins MedianSorter_R/valid] [get_bd_pins median_valid_concat/In2]
+  connect_bd_net -net clk_wiz_0_clk_median_90 [get_bd_pins clk_wiz_pll/clk_median_90] [get_bd_pins MedianSorter_B/clk] [get_bd_pins MedianSorter_G/clk] [get_bd_pins MedianSorter_R/clk]
+  connect_bd_net -net clk_wiz_0_clk_srl_30 [get_bd_pins clk_wiz_pll/clk_srl_30] [get_bd_pins read_mangment_0/clk_matrix]
+  connect_bd_net -net clk_wiz_0_read_filt_clk [get_bd_pins clk_wiz_pll/clk_ram_10] [get_bd_pins line_buffer2/clkb] [get_bd_pins line_buffer1/clkb] [get_bd_pins line_buffer3/clkb] [get_bd_pins line_buffer4/clkb] [get_bd_pins line_buffer1/clka] [get_bd_pins line_buffer3/clka] [get_bd_pins line_buffer2/clka] [get_bd_pins line_buffer4/clka] [get_bd_pins proc_sys_reset_0/slowest_sync_clk] [get_bd_pins read_mangment_0/clk_ram] [get_bd_pins write_buffer_manager_0/clk]
+  connect_bd_net -net clk_wiz_pll_locked [get_bd_pins clk_wiz_pll/locked] [get_bd_pins write_buffer_manager_0/ce]
+  connect_bd_net -net clka_0_1 [get_bd_ports pixel_clk] [get_bd_pins clk_wiz_pll/clk_in1]
+  connect_bd_net -net line_buffer1_doutb [get_bd_pins line_buffer1/doutb] [get_bd_pins read_mangment_0/pixel_read_line1]
+  connect_bd_net -net line_buffer2_doutb [get_bd_pins line_buffer2/doutb] [get_bd_pins read_mangment_0/pixel_read_line2]
+  connect_bd_net -net line_buffer3_doutb [get_bd_pins line_buffer3/doutb] [get_bd_pins read_mangment_0/pixel_read_line3]
+  connect_bd_net -net line_buffer4_doutb [get_bd_pins line_buffer4/doutb] [get_bd_pins read_mangment_0/pixel_read_line4]
+  connect_bd_net -net pixel_in_0_1 [get_bd_ports pixel_in_0] [get_bd_pins write_buffer_manager_0/pixel_in]
+  connect_bd_net -net proc_sys_reset_0_peripheral_aresetn [get_bd_pins proc_sys_reset_0/peripheral_aresetn] [get_bd_pins read_mangment_0/rst] [get_bd_pins write_buffer_manager_0/rst]
+  connect_bd_net -net read_mangment_0_address_read [get_bd_pins read_mangment_0/address_read] [get_bd_pins line_buffer1/addrb] [get_bd_pins line_buffer3/addrb] [get_bd_pins line_buffer2/addrb] [get_bd_pins line_buffer4/addrb]
+  connect_bd_net -net read_mangment_0_matrix_blue [get_bd_pins read_mangment_0/matrix_blue] [get_bd_pins MedianSorter_B/pixels]
+  connect_bd_net -net read_mangment_0_matrix_green [get_bd_pins read_mangment_0/matrix_green] [get_bd_pins MedianSorter_G/pixels]
+  connect_bd_net -net read_mangment_0_matrix_red [get_bd_pins read_mangment_0/matrix_red] [get_bd_pins MedianSorter_R/pixels]
+  connect_bd_net -net read_mangment_0_ready [get_bd_pins read_mangment_0/ready] [get_bd_pins MedianSorter_B/enable] [get_bd_pins MedianSorter_G/enable] [get_bd_pins MedianSorter_R/enable]
+  connect_bd_net -net reset_1 [get_bd_ports reset] [get_bd_pins proc_sys_reset_0/ext_reset_in]
+  connect_bd_net -net util_reduced_logic_0_Res [get_bd_pins bitwise_and/Res] [get_bd_ports pixel_filtered_valid]
+  connect_bd_net -net write_buffer_manager_0_address [get_bd_pins write_buffer_manager_0/pixel_w] [get_bd_pins line_buffer1/dina] [get_bd_pins line_buffer2/dina] [get_bd_pins line_buffer3/dina] [get_bd_pins line_buffer4/dina]
+  connect_bd_net -net write_buffer_manager_0_address1 [get_bd_pins write_buffer_manager_0/address] [get_bd_pins line_buffer1/addra] [get_bd_pins line_buffer2/addra] [get_bd_pins line_buffer3/addra] [get_bd_pins line_buffer4/addra]
+  connect_bd_net -net write_buffer_manager_0_enable_read_srl [get_bd_pins write_buffer_manager_0/enable_read_srl] [get_bd_pins read_mangment_0/start_read]
+  connect_bd_net -net write_buffer_manager_0_we_1 [get_bd_pins write_buffer_manager_0/we_1] [get_bd_pins line_buffer1/wea]
+  connect_bd_net -net write_buffer_manager_0_we_2 [get_bd_pins write_buffer_manager_0/we_2] [get_bd_pins line_buffer2/wea]
+  connect_bd_net -net write_buffer_manager_0_we_3 [get_bd_pins write_buffer_manager_0/we_3] [get_bd_pins line_buffer3/wea]
+  connect_bd_net -net write_buffer_manager_0_we_4 [get_bd_pins write_buffer_manager_0/we_4] [get_bd_pins line_buffer4/wea]
+  connect_bd_net -net xlconcat_0_dout [get_bd_pins median_valid_concat/dout] [get_bd_pins bitwise_and/Op1]
+  connect_bd_net -net xlconcat_1_dout [get_bd_pins color_merger/dout] [get_bd_ports filtered_pixel]
+  connect_bd_net -net xlconstant_0_dout [get_bd_pins zero_rst/dout] [get_bd_pins clk_wiz_pll/reset]
 
   # Create address segments
 
@@ -374,6 +461,7 @@ proc create_root_design { parentCell } {
   # Restore current instance
   current_bd_instance $oldCurInst
 
+  validate_bd_design
   save_bd_design
 }
 # End of create_root_design()
@@ -385,6 +473,4 @@ proc create_root_design { parentCell } {
 
 create_root_design ""
 
-
-common::send_gid_msg -ssname BD::TCL -id 2053 -severity "WARNING" "This Tcl script was generated from a block design that has not been validated. It is possible that design <$design_name> may result in errors during validation."
 

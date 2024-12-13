@@ -34,25 +34,23 @@ USE ieee.std_logic_arith.all;
 --library UNISIM;
 --use UNISIM.VComponents.all;
 
-entity image_tb is
+entity image_clean_tb is
 --  Port ( );
-end image_tb;
+end image_clean_tb;
 
-architecture Behavioral of image_tb is
+architecture Behavioral of image_clean_tb is
     signal pixel : std_logic_vector(11 downto 0) ;
     signal valid : std_logic ;
     
-    COMPONENT design_1_wrapper is
-      port (
-        filtered_pixel : out STD_LOGIC_VECTOR ( 11 downto 0 );
-        pixel_clk : in STD_LOGIC;
-        pixel_filtered_valid : out STD_LOGIC;
-        pixel_in_0 : in STD_LOGIC_VECTOR ( 11 downto 0 );
-        reset : in STD_LOGIC;
-        valid_pixel : in STD_LOGIC
-
-      );
-    end COMPONENT;
+--    COMPONENT design_1_wrapper is
+--      port (
+--        filtered_pixel : out STD_LOGIC_VECTOR ( 11 downto 0 );
+--        pixel_clk : in STD_LOGIC;
+--        pixel_filtered_valid : out STD_LOGIC;
+--        pixel_in_0 : in STD_LOGIC_VECTOR ( 11 downto 0 );
+--        reset : in STD_LOGIC
+--      );
+--    end COMPONENT;
     
     
     signal pixel_out_filtered : std_logic_vector(11 downto 0);
@@ -62,82 +60,66 @@ architecture Behavioral of image_tb is
     signal counter : std_logic_vector (19 downto 0) :=(others=>'0');
     signal counter_write : std_logic_vector (19 downto 0) :=(others=>'0');
     
-    constant time_period : time :=100ns;
-    constant pipline_time : time :=7ns;
+    constant time_period : time :=10ns;
 begin
     process  --
-    file source_file : TEXT open READ_MODE is "D:\FPGA_EXPERT\fgga_expert_final_project\noisy_house_rgb444_decimal.txt";--yelement102_dirt.txt";
+    file source_file : TEXT open READ_MODE is "D:\FPGA_EXPERT\fgga_expert_final_project\yelement102_dirt.txt";
     variable lineOfTextFromFile : line; 
     variable status : boolean :=false;
     variable pixel_val : integer;
-    variable finish_write : std_logic:='0';
     begin
-       wait for 200us;
-        while (not ENDFILE(source_file) or counter_write/=307200 ) loop
-            if(finish_write='0') then
+        while (not ENDFILE(source_file)) loop
             readline(source_file,lineOfTextFromFile);
             for I in 1 to 640 loop --lineOfTextFromFile'length loop 
                 read(lineOfTextFromFile,pixel_val,status);
-                if(status) then
-                    pixel<=conv_std_logic_vector(pixel_val,12);
-                    --"0000"&
-                    valid<='1';
+--                if(status) then
+                    pixel<="0000"&conv_std_logic_vector(pixel_val,8);
                     counter<=counter+1;
-                    if(counter=307199) then 
-                        finish_write:='1';
-                    end if;
---  
-                else 
-                    pixel<=(others=>'0');
-                    valid<='0';
-                end if;
-                wait for 100 ns;
+--                    valid<='1';
+--                else 
+--                    pixel<=(others=>'0');
+--                    valid<='0';
+--                end if;
+                wait for 10 ns;
             end loop;
-            
-            end if;
         end loop;
     end process;
 
 rst<='0','0' after time_period*4;
 clk<=not clk after time_period/2;
-dut: design_1_wrapper 
-  port map (
-    filtered_pixel=>pixel_out_filtered,
-    pixel_clk=>clk,
-    pixel_filtered_valid =>dut_valid,
-    pixel_in_0 =>pixel,
-    reset =>rst,
-    valid_pixel=>valid
-  );
+--dut: design_1_wrapper 
+--  port map (
+--    filtered_pixel=>pixel_out_filtered,
+--    pixel_clk=>clk,
+--    pixel_filtered_valid =>dut_valid,
+--    pixel_in_0 =>pixel,
+--    reset =>rst
+--  );
 
 
-    process 
-    file write_file : TEXT open write_mode is "D:\FPGA_EXPERT\fgga_expert_final_project\house_color_filtered.txt";  --filtered_pic1.txt
+    process  
+    file write_file : TEXT open write_mode is "D:\FPGA_EXPERT\fgga_expert_final_project\clean_pic.txt";
     variable line_val:line;
     variable i: integer :=0 ;
     variable j: integer :=0;
     
     begin
         
---        wait for 100ns;
         while (j<480) loop
             while(i<640) loop
-               wait for 10ns;
-               if(dut_valid='1') then
-                write(line_val , integer'image(conv_integer(pixel_out_filtered)) & " ");
+--               if(valid='1') then
+                write(line_val , integer'image(conv_integer(pixel)) & " ");
                 i:=i+1;
                 counter_write<=counter_write+1;
-                
---                counter_write<=counter_write+10;
---                i:=i;
-                end if;
---                wait for 100ns;
+--                end if;
+                wait for 10ns;
             end loop;
             writeline(write_file,line_val);
             j:=j+1;
             i:=0;
+            
         end loop;
-                
+        wait;        
     end process;
 
 

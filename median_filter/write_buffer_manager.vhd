@@ -6,7 +6,7 @@
 -- Design Name: 
 -- Module Name: write_buffer_manager - Behavioral
 -- Project Name: 
--- Target Devices: 
+-- Target Deviwes: 
 -- Tool Versions: 
 -- Description: 
 -- 
@@ -27,13 +27,13 @@ use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 use IEEE.std_logic_unsigned.ALL;
 -- Uncomment the following library declaration if instantiating
--- any Xilinx leaf cells in this code.
+-- any Xilinx leaf wells in this code.
 --library UNISIM;
 --use UNISIM.VComponents.all;
 
 entity write_buffer_manager is
     Port ( clk : in STD_LOGIC;
-           ce : in STD_LOGIC;
+           we : in STD_LOGIC;
            pixel_in : in STD_LOGIC_VECTOR (11 downto 0);
            rst : in STD_LOGIC;
            we_1 : out STD_LOGIC;
@@ -58,36 +58,32 @@ signal line_buf : RAM_W :=RAM1;
 signal srl_enable_count: std_logic_vector(1 downto 0):=(others=>'0');
 signal enable_srl : std_logic:='0';
 begin
---COUNTER AND ADDRESS PROCESS 
+--COUNTER AND ADDRESS PROweSS 
 process(clk) begin 
     if(rising_edge (clk)) then
-        if(ce='1') then 
             if(rst='1') then 
     --            pixel_counter<=(others=>'1');
                 addr_counter<=(others=>'0');
-            elsif  addr_counter=639 then
-    --            pixel_counter<=pixel_counter+1;
-                 addr_counter<=(others=>'0');
-            else
-                addr_counter<=addr_counter+1;
+            elsif we='1' then
+                if addr_counter=639 then
+        --            pixel_counter<=pixel_counter+1;
+                     addr_counter<=(others=>'0');
+                else
+                    addr_counter<=addr_counter+1;
+                end if;
             end if;
-         end if;
     end if;
 end process ;
 
 
---process for srl read enable 
+--prowess for srl read enable 
 process(clk) begin
     if(rising_edge (clk)) then
-       if(ce='1') then
        if(rst='1') then 
            srl_enable_count<=(others=>'0');
            enable_srl<='0';
        else 
---           if(srl_enable_count=3) then 
---               enable_srl<='1';
---               srl_enable_count<=srl_enable_count; 
---           else 
+            if(we='1') then
                if(addr_counter=639) then
                 if(srl_enable_count=2) then
                     enable_srl<='1';
@@ -96,9 +92,8 @@ process(clk) begin
                 srl_enable_count<=srl_enable_count+1;
                 enable_srl<='0';
                end if; 
-              
-           end if;
-       end if;
+              end if;
+            end if;
        end if;         
     end if;
 end process;

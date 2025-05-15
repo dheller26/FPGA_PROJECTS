@@ -1,8 +1,6 @@
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
-// This testbench will exercise both the UART Tx and Rx.
-// It sends out byte 0xAB over the transmitter
-// It then exercises the receive by receiving byte 0x3F
+// This testbench will exercise both the UART Tx and Rx on LOOPBACK MODE
 //////////////////////////////////////////////////////////////////////////////////
 
 
@@ -24,36 +22,11 @@ wire tx_done;
 wire tx_active;
 wire tx_serial_data;
 // for uart rx 
-reg rx_serial=1;
+wire rx_serial;
 wire [7:0] rx_byte;
 wire rx_valid;
 
- // Takes in input byte and serializes it 
-  task UART_WRITE_BYTE;
-    input [7:0] i_Data;
-    integer     ii;
-    begin
-       
-      // Send Start Bit
-      rx_serial <= 1'b0;
-      #(WAIT_DELAY);
-//      #(BAUD_RATE);
-//      #1000;
-       
-       
-      // Send Data Byte
-      for (ii=0; ii<8; ii=ii+1)
-        begin
-          rx_serial <= i_Data[ii];
-          #(WAIT_DELAY);
-        end
-       
-      // Send Stop Bit
-      rx_serial <= 1'b1;
-      #(WAIT_DELAY);
-     end
-  endtask // UART_WRITE_BYTE
-  
+assign rx_serial = tx_serial_data ;
   uart_rx
     #( .BAUD_RATE(BAUD_RATE),
        .CLK_HZ(FREQ_HZ))
@@ -89,15 +62,17 @@ wire rx_valid;
       tx_message <= 8'hAB;
       @(posedge clk);
       i_tx_valid <= 1'b0;
-      @(posedge tx_done);
+      
+      // Wait until TX is done
+
+      //@(posedge tx_done);
        
-      // Send a command to the UART (exercise Rx)
-      @(posedge clk);
-      UART_WRITE_BYTE(8'h3F);
-      @(posedge clk);
-             
+       // Wait for RX to finish receiving
+      wait (rx_valid == 1'b1);
+      @(posedge clk);  // Wait for stable rx_byte
+    
       // Check that the correct command was received
-      if (rx_byte == 8'h3F)
+      if (rx_byte == 8'hAB)
         $display("Test Passed - Correct Byte Received");
       else
         $display("Test Failed - Incorrect Byte Received");

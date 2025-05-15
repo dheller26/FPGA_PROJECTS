@@ -21,8 +21,8 @@
 
 
 module uart_rx
-    #(parameter BAUD_RATE,
-      parameter CLK_HZ)
+    #(parameter BAUD_RATE=9600,
+      parameter CLK_HZ=10_000_000)
     (
     input source_clk,
     input i_rx_serial,
@@ -83,7 +83,7 @@ module uart_rx
                     bit_index<=0;
                     if(clock_count ==(CLKS_PER_BIT -1)/2) //need to get to the middle of the bit 
                     begin
-                        if(rx_data ==1'b0) begin// need to asser that the when we get to the middle of the bit we still in 0 
+                        if(rx_data ==1'b0) begin// need to assert that the when we get to the middle of the bit we still in 0 
                             clock_count <=0;
                             states <=s_DATA_BITS ;
                         end
@@ -111,7 +111,7 @@ module uart_rx
                        states <=s_DATA_BITS ; 
                     end else begin
                         bit_index <=0;
-                        state<=s_STOP_BIT ;
+                        states<=s_STOP_BIT ;
                     end                    
                    end                
                 end 
@@ -137,9 +137,12 @@ module uart_rx
         
         endcase
         
-        assign o_rx_valid =rx_valid;
-        assign o_RX_message =rx_byte;
+
         
     end
+    
+    
+    assign o_rx_valid =rx_valid;
+    assign o_RX_message =rx_byte;
     
 endmodule
